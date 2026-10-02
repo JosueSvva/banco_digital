@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException,status
-from app.schemas.usuario import UsuarioCadastro
+from app.schemas.usuario import UsuarioCadastro,UsuarioLogin
 from app.database import SessionLocal
 from app.models.usuario import Usuario
 from pwdlib import PasswordHash
@@ -42,3 +42,26 @@ def cadastro (dados:UsuarioCadastro):
         sessao.close()  
         print("Fechando sessao" )
 
+
+@app.post("/Login")
+def login (dados:UsuarioLogin):
+    try:
+        sessao = SessionLocal()
+        login1 =sessao.query(Usuario).filter(Usuario.email == dados.email).first()
+        if login1 == None:
+            raise HTTPException(
+                status_code= status.HTTP_401_UNAUTHORIZED,
+                detail= "Email ou senha invalido.",
+            )
+        password_login = PasswordHash.recommended()
+        senha_valida = password_login.verify(dados.senha, login1.senha_hash)
+        if senha_valida == True:
+                return "Login Realizado Com Sucesso."
+        else:
+                raise HTTPException(
+                status_code= status.HTTP_401_UNAUTHORIZED,
+                detail= "Email ou senha invalido."
+            )
+    finally:
+        sessao.close()  
+        print("Fechando sessao" )
