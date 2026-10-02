@@ -274,3 +274,44 @@ def transferencia(
     finally:
         sessao.close()
         print("Fechando sessao")
+
+
+@app.get("/extrato/{numero_conta}")
+def extrato(numero_conta: int):
+    try:
+        sessao = SessionLocal()
+
+        conta = (
+            sessao.query(Conta)
+            .filter(Conta.numero_conta == numero_conta)
+            .first()
+        )
+
+        if conta is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conta nao encontrada."
+            )
+
+        transacoes = (
+            sessao.query(Transacao)
+            .filter(
+                (Transacao.conta_origem_id == conta.id) |
+                (Transacao.conta_destino_id == conta.id)
+            )
+            .order_by(Transacao.data.desc())
+            .all()
+        )
+
+        return [
+            {
+                "tipo": transacao.tipo_transacao,
+                "valor": transacao.valor,
+                "data": transacao.data
+            }
+            for transacao in transacoes
+        ]
+
+    finally:
+        sessao.close()
+        print("Fechando sessao")
