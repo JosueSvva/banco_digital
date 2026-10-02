@@ -180,3 +180,75 @@ def saque(numero_conta: int, valor: Decimal):
     finally:
         sessao.close()
         print("Fechando sessao")
+
+@app.post("/transferencia")
+def transferencia(
+    conta_origem: int,
+    conta_destino: int,
+    valor: Decimal
+):
+    try:
+        sessao = SessionLocal()
+
+        if valor <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="O valor da transferencia deve ser maior que zero."
+            )
+
+        if conta_origem == conta_destino:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="A conta de origem e destino devem ser diferentes."
+            )
+
+        origem = (
+            sessao.query(Conta)
+            .filter(Conta.numero_conta == conta_origem)
+            .first()
+        )
+
+        if origem is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conta de origem nao encontrada."
+            )
+
+        destino = (
+            sessao.query(Conta)
+            .filter(Conta.numero_conta == conta_destino)
+            .first()
+        )
+
+        if destino is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conta de destino nao encontrada."
+            )
+
+        if valor > origem.saldo:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Saldo insuficiente."
+            )
+
+        origem.saldo -= valor
+        destino.saldo += valor
+
+        sessao.commit()
+
+        sessao.refresh(origem)
+        sessao.refresh(destino)
+
+        return {
+            "mensagem": "Transferencia realizada com sucesso.",
+            "conta_origem": origem.numero_conta,
+            "conta_destino": destino.numero_conta,
+            "valor_transferido": valor,
+            "saldo_origem": origem.saldo,
+            "saldo_destino": destino.saldo
+        }
+
+    finally:
+        sessao.close()
+        print("Fechando sessao")
