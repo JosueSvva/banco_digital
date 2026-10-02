@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banco Digital</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <section id="login-view" class="view">
+    <div class="card auth-card">
+      <h1>Banco Digital</h1>
+      <p>Acesse sua conta</p>
+      <form id="login-form">
+        <input id="login-email" type="email" placeholder="E-mail" required>
+        <input id="login-senha" type="password" placeholder="Senha" required>
+        <button type="submit">Entrar</button>
+      </form>
+      <p id="login-message" class="message"></p>
+      <button id="show-register" class="secondary">Criar conta</button>
+    </div>
+  </section>
+
+  <section id="register-view" class="view hidden">
+    <div class="card auth-card">
+      <h1>Criar conta</h1>
+      <form id="register-form">
+        <input id="register-nome" type="text" placeholder="Nome" required>
+        <input id="register-email" type="email" placeholder="E-mail" required>
+        <input id="register-cpf" type="text" maxlength="14" placeholder="CPF" required>
+        <input id="register-senha" type="password" minlength="6" placeholder="Senha" required>
+        <button type="submit">Cadastrar</button>
+      </form>
+      <p id="register-message" class="message"></p>
+      <button id="show-login" class="secondary">Voltar para login</button>
+    </div>
+  </section>
+
+  <section id="dashboard-view" class="view hidden">
+    <header class="topbar">
+      <div><h1>Banco Digital</h1><span id="welcome"></span></div>
+      <button id="logout" class="danger">Sair</button>
+    </header>
+
+    <main class="dashboard">
+      <div class="card balance-card">
+        <div><span>Conta</span><strong id="account-number">-</strong></div>
+        <div><span>Saldo</span><strong id="balance">R$ 0,00</strong></div>
+        <button id="refresh-balance">Atualizar</button>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h2>Depositar</h2>
+          <form id="deposit-form">
+            <input id="deposit-value" type="number" step="0.01" min="0.01" placeholder="Valor" required>
+            <button type="submit">Depositar</button>
+          </form>
+          <p id="deposit-message" class="message"></p>
+        </div>
+
+        <div class="card">
+          <h2>Sacar</h2>
+          <form id="withdraw-form">
+            <input id="withdraw-value" type="number" step="0.01" min="0.01" placeholder="Valor" required>
+            <button type="submit">Sacar</button>
+          </form>
+          <p id="withdraw-message" class="message"></p>
+        </div>
+
+        <div class="card">
+          <h2>Transferir</h2>
+          <form id="transfer-form">
+            <input id="transfer-account" type="number" min="1" placeholder="Conta destino" required>
+            <input id="transfer-value" type="number" step="0.01" min="0.01" placeholder="Valor" required>
+            <button type="submit">Transferir</button>
+          </form>
+          <p id="transfer-message" class="message"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title"><h2>Extrato</h2><button id="refresh-statement" class="secondary">Atualizar</button></div>
+        <div id="statement"></div>
+      </div>
+    </main>
+  </section>
+  <script src="script.js"></script>
+</body>
+</html>

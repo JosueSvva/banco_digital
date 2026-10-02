@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException,status, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from app.schemas.usuario import UsuarioCadastro,UsuarioLogin
 from app.database import SessionLocal
 from app.models.usuario import Usuario
@@ -47,6 +48,13 @@ def verificar_token(
         )
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 def mascarar_cpf(cpf):
     return f"***.***.***-{cpf[-2:]}"
 @app.get("/usuario/{usuario_id}")
@@ -353,11 +361,7 @@ def transferencia(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A conta de origem e destino devem ser diferentes."
             )
-        if origem.usuario_id != usuario_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Voce nao tem permissao para movimentar esta conta."
-            )
+
         origem = (
             sessao.query(Conta)
             .filter(Conta.numero_conta == conta_origem)
@@ -368,6 +372,12 @@ def transferencia(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conta de origem nao encontrada."
+            )
+
+        if origem.usuario_id != usuario_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Voce nao tem permissao para movimentar esta conta."
             )
 
         destino = (
@@ -390,12 +400,13 @@ def transferencia(
 
         origem.saldo -= valor
         destino.saldo += valor
+
         transacao = Transacao(
-        tipo_transacao="TRANSFERENCIA",
-        valor=valor,
-        conta_origem_id=origem.id,
-        conta_destino_id=destino.id
-            )
+            tipo_transacao="TRANSFERENCIA",
+            valor=valor,
+            conta_origem_id=origem.id,
+            conta_destino_id=destino.id
+        )
 
         sessao.add(transacao)
 
