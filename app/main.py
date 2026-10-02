@@ -1,12 +1,48 @@
-from fastapi import FastAPI, HTTPException,status
+from fastapi import FastAPI, HTTPException,status, Depends
 from app.schemas.usuario import UsuarioCadastro,UsuarioLogin
 from app.database import SessionLocal
 from app.models.usuario import Usuario
 from app.models.conta import Conta
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pwdlib import PasswordHash
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 from app.models.transasao import Transacao
+import os
+import jwt
+from dotenv import load_dotenv
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = "HS256"
+security = HTTPBearer()
+def verificar_token(
+    credenciais: HTTPAuthorizationCredentials = Depends(security)
+):
+    try:
+        token = credenciais.credentials
+
+        dados = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        usuario_id = dados.get("sub")
+
+        if usuario_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token invalido."
+            )
+
+        return int(usuario_id)
+
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalido."
+        )
 
 app = FastAPI()
 
@@ -61,7 +97,20 @@ def login (dados:UsuarioLogin):
         password_login = PasswordHash.recommended()
         senha_valida = password_login.verify(dados.senha, login1.senha_hash)
         if senha_valida == True:
-                return "Login Realizado Com Sucesso."
+                token = jwt.encode(
+                    {
+                    "sub": str(login1.id),
+                     "email": login1.email
+                    },
+                SECRET_KEY,
+                algorithm=ALGORITHM
+                )
+
+                return {
+                "mensagem": "Login realizado com sucesso",
+                "access_token": token,
+                "token_type": "bearer"
+                }
         else:
                 raise HTTPException(
                 status_code= status.HTTP_401_UNAUTHORIZED,
@@ -73,7 +122,9 @@ def login (dados:UsuarioLogin):
 
 
 @app.get("/saldo/{numero_conta}")
-def saldo(numero_conta: int):
+def saldo(numero_conta: int,
+          usuario_id: int = Depends(verificar_token)
+          ):
     try:
         sessao = SessionLocal()
         saldo1 = sessao.query(Conta).filter(Conta.numero_conta == numero_conta).first()
@@ -82,16 +133,24 @@ def saldo(numero_conta: int):
                             status_code= status.HTTP_404_NOT_FOUND,
                             detail= "Conta Nao Encontrada.",
                         )
+        if saldo1.usuario_id != usuario_id:
+            raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail= "Voce nao tem permissao para acessar esta conta."
+        )
         return {
                 "numero_conta" : saldo1.numero_conta,
                 "Saldo" : saldo1.saldo
-                }
+                 }
+    
     finally:
         sessao.close()
         print("Fechando sessao" )
 
 @app.post("/deposito/{numero_conta}")
-def deposito(numero_conta: int, valor: Decimal):
+def deposito(numero_conta: int, valor: Decimal,
+             usuario_id: int = Depends(verificar_token)
+            ):
     try:
         sessao = SessionLocal()
 
@@ -113,6 +172,11 @@ def deposito(numero_conta: int, valor: Decimal):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conta nao encontrada."
             )
+        if conta.usuario_id != usuario_id:
+            raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Voce nao tem permissao para acessar esta conta."
+             )
         conta.saldo += valor
         transacao = Transacao(
         tipo_transacao="DEPOSITO",
@@ -137,7 +201,9 @@ def deposito(numero_conta: int, valor: Decimal):
         print("Fechando sessao")
 
 @app.post("/saque/{numero_conta}")
-def saque(numero_conta: int, valor: Decimal):
+def saque(numero_conta: int, valor: Decimal,
+          usuario_id: int = Depends(verificar_token)
+          ):
     try:
         sessao = SessionLocal()
 
@@ -161,8 +227,11 @@ def saque(numero_conta: int, valor: Decimal):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conta nao encontrada."
             )
-
-        
+        if conta.usuario_id != usuario_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Voce nao tem permissao para acessar esta conta."
+            )
         if valor > conta.saldo:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -199,7 +268,8 @@ def saque(numero_conta: int, valor: Decimal):
 def transferencia(
     conta_origem: int,
     conta_destino: int,
-    valor: Decimal
+    valor: Decimal,
+    usuario_id: int = Depends(verificar_token)
 ):
     try:
         sessao = SessionLocal()
@@ -215,7 +285,11 @@ def transferencia(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A conta de origem e destino devem ser diferentes."
             )
-
+        if origem.usuario_id != usuario_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Voce nao tem permissao para movimentar esta conta."
+            )
         origem = (
             sessao.query(Conta)
             .filter(Conta.numero_conta == conta_origem)
@@ -277,7 +351,9 @@ def transferencia(
 
 
 @app.get("/extrato/{numero_conta}")
-def extrato(numero_conta: int):
+def extrato(numero_conta: int,
+            usuario_id: int = Depends(verificar_token)
+            ):
     try:
         sessao = SessionLocal()
 
@@ -292,7 +368,11 @@ def extrato(numero_conta: int):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conta nao encontrada."
             )
-
+        if conta.usuario_id != usuario_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Voce nao tem permissao para acessar esta conta."
+                )
         transacoes = (
             sessao.query(Transacao)
             .filter(
