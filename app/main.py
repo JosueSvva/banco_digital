@@ -89,3 +89,42 @@ def saldo(numero_conta: int):
     finally:
         sessao.close()
         print("Fechando sessao" )
+
+@app.post("/deposito/{numero_conta}")
+def deposito(numero_conta: int, valor: Decimal):
+    try:
+        sessao = SessionLocal()
+
+        
+        if valor <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="O valor do deposito deve ser maior que zero."
+            )
+
+
+        conta = (
+            sessao.query(Conta)
+            .filter(Conta.numero_conta == numero_conta)
+            .first()
+        )
+        if conta is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conta nao encontrada."
+            )
+        conta.saldo += valor
+
+        sessao.commit()
+
+        sessao.refresh(conta)
+
+        return {
+        "numero_conta": conta.numero_conta,
+        "valor_depositado": valor,
+        "novo_saldo": conta.saldo
+            }
+
+    finally:
+        sessao.close()
+        print("Fechando sessao")
