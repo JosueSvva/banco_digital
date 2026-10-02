@@ -2,8 +2,10 @@ from fastapi import FastAPI, HTTPException,status
 from app.schemas.usuario import UsuarioCadastro,UsuarioLogin
 from app.database import SessionLocal
 from app.models.usuario import Usuario
+from app.models.conta import Conta
 from pwdlib import PasswordHash
 from sqlalchemy.exc import IntegrityError
+from decimal import Decimal
 
 
 app = FastAPI()
@@ -22,8 +24,11 @@ def cadastro (dados:UsuarioCadastro):
      senha_hash = password_hash.hash(dados.senha)
      usuario1 = Usuario(nome = dados.nome,email = dados.email,cpf = dados.cpf,senha_hash = senha_hash)
      sessao.add(usuario1)
+     sessao.flush()
+     conta_usuario = Conta(usuario_id = usuario1.id, saldo = Decimal("0.00"), numero_conta = 1000 + usuario1.id)
+     sessao.add(conta_usuario)
      sessao.commit()
-     return{"mengsaem":usuario1}
+     return{"Mensagem":"Cadastro Realizado com Sucesso"}
     except IntegrityError as erro:
         print(erro)
         sessao.rollback()
@@ -64,4 +69,23 @@ def login (dados:UsuarioLogin):
             )
     finally:
         sessao.close()  
+        print("Fechando sessao" )
+
+
+@app.get("/saldo/{numero_conta}")
+def saldo(numero_conta: int):
+    try:
+        sessao = SessionLocal()
+        saldo1 = sessao.query(Conta).filter(Conta.numero_conta == numero_conta).first()
+        if saldo1 == None:
+            raise HTTPException(
+                            status_code= status.HTTP_404_NOT_FOUND,
+                            detail= "Conta Nao Encontrada.",
+                        )
+        return {
+                "numero_conta" : saldo1.numero_conta,
+                "Saldo" : saldo1.saldo
+                }
+    finally:
+        sessao.close()
         print("Fechando sessao" )
