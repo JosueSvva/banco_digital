@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey,LargeBinary
 from app.database import Base
 
 class Usuario(Base):
@@ -6,6 +6,7 @@ class Usuario(Base):
     id = Column(Integer, primary_key= True)
     nome = Column(String,nullable=False)
     email = Column(String, nullable=False, unique=True)
-    cpf = Column(String, nullable=False, unique=True)
+    cpf_criptografado = Column(LargeBinary, nullable=True)
+    cpf_hash = Column(String, nullable=True, unique=True)
     senha_hash = Column(String, nullable=False)
 

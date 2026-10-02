@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
 from datetime import datetime, timedelta, timezone
 from app.models.transasao import Transacao
+from sqlalchemy import text
 import os
 import jwt
 from dotenv import load_dotenv
@@ -46,6 +47,47 @@ def verificar_token(
         )
 
 app = FastAPI()
+def mascarar_cpf(cpf):
+    return f"***.***.***-{cpf[-2:]}"
+@app.get("/usuario/{usuario_id}")
+def consultar_usuario(usuario_id: int):
+    sessao = SessionLocal()
+
+    try:
+        chave = os.getenv("CPF_ENCRYPTION_KEY")
+
+        usuario = sessao.query(Usuario).filter(
+            Usuario.id == usuario_id
+        ).first()
+
+        if not usuario:
+            raise HTTPException(
+                status_code=404,
+                detail="Usuario nao encontrado."
+            )
+
+        resultado = sessao.execute(
+            text("""
+                SELECT pgp_sym_decrypt(
+                    :cpf_criptografado,
+                    :chave
+                )
+            """),
+            {
+                "cpf_criptografado": usuario.cpf_criptografado,
+                "chave": chave
+            }
+        ).fetchone()
+
+        cpf = resultado[0]
+
+        return {
+            "nome": usuario.nome,
+            "cpf": mascarar_cpf(cpf)
+        }
+
+    finally:
+        sessao.close()
 
 @app.get("/")
 def inicio():
@@ -59,7 +101,28 @@ def cadastro (dados:UsuarioCadastro):
      sessao = SessionLocal()
      password_hash = PasswordHash.recommended()
      senha_hash = password_hash.hash(dados.senha)
-     usuario1 = Usuario(nome = dados.nome,email = dados.email,cpf = dados.cpf,senha_hash = senha_hash)
+     chave = os.getenv("CPF_ENCRYPTION_KEY")
+     if not chave:
+        raise RuntimeError("CPF_ENCRYPTION_KEY não configurada.")
+     resultado = sessao.execute(
+    text("""
+        SELECT
+            pgp_sym_encrypt(:cpf, :chave),
+            encode(digest(:cpf, 'sha256'), 'hex')
+    """),
+    {
+        "cpf": dados.cpf,
+        "chave": chave
+    }
+).fetchone()
+     cpf_criptografado, cpf_hash = resultado
+     usuario1 = Usuario(
+    nome=dados.nome,
+    email=dados.email,
+    cpf_criptografado=cpf_criptografado,
+    cpf_hash=cpf_hash,
+    senha_hash=senha_hash
+    )
      sessao.add(usuario1)
      sessao.flush()
      conta_usuario = Conta(usuario_id = usuario1.id, saldo = Decimal("0.00"), numero_conta = 1000 + usuario1.id)
@@ -69,7 +132,7 @@ def cadastro (dados:UsuarioCadastro):
     except IntegrityError as erro:
         print(erro)
         sessao.rollback()
-        if "usuario.cpf" in str(erro):
+        if "usuario_cpf_hash_key" in str(erro):
          raise HTTPException(
             status_code = status.HTTP_409_CONFLICT,
             detail = "Cpf Ja Cadastrado.",
