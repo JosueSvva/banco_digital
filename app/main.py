@@ -6,7 +6,7 @@ from app.models.conta import Conta
 from pwdlib import PasswordHash
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
-
+from app.models.transasao import Transacao
 
 app = FastAPI()
 
@@ -114,6 +114,13 @@ def deposito(numero_conta: int, valor: Decimal):
                 detail="Conta nao encontrada."
             )
         conta.saldo += valor
+        transacao = Transacao(
+        tipo_transacao="DEPOSITO",
+        valor=valor,
+        conta_destino_id=conta.id
+            )
+
+        sessao.add(transacao)
 
         sessao.commit()
 
@@ -164,6 +171,13 @@ def saque(numero_conta: int, valor: Decimal):
 
         
         conta.saldo -= valor
+        transacao = Transacao(
+        tipo_transacao="SAQUE",
+        valor=valor,
+        conta_origem_id=conta.id
+            )
+
+        sessao.add(transacao)
 
         
         sessao.commit()
@@ -234,6 +248,14 @@ def transferencia(
 
         origem.saldo -= valor
         destino.saldo += valor
+        transacao = Transacao(
+        tipo_transacao="TRANSFERENCIA",
+        valor=valor,
+        conta_origem_id=origem.id,
+        conta_destino_id=destino.id
+            )
+
+        sessao.add(transacao)
 
         sessao.commit()
 
