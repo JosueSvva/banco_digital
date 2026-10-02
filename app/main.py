@@ -7,6 +7,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pwdlib import PasswordHash
 from sqlalchemy.exc import IntegrityError
 from decimal import Decimal
+from datetime import datetime, timedelta, timezone
 from app.models.transasao import Transacao
 import os
 import jwt
@@ -97,14 +98,18 @@ def login (dados:UsuarioLogin):
         password_login = PasswordHash.recommended()
         senha_valida = password_login.verify(dados.senha, login1.senha_hash)
         if senha_valida == True:
+                agora = datetime.now(timezone.utc)
+                expiracao = agora + timedelta(minutes=30)
                 token = jwt.encode(
                     {
                     "sub": str(login1.id),
-                     "email": login1.email
+                     "email": login1.email,
+                      "iat": agora,
+                     "exp": expiracao
                     },
                 SECRET_KEY,
                 algorithm=ALGORITHM
-                )
+             )
 
                 return {
                 "mensagem": "Login realizado com sucesso",
